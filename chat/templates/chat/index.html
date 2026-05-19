@@ -1,0 +1,89 @@
+<!-- chat/templates/chat/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco-Agri & Botanical Advisor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="bg-gray-50 flex flex-col h-screen">
+    <header class="bg-green-700 text-white p-4 shadow-md text-center">
+        <h1 class="text-2xl font-bold">Eco-Agri & Botanical Advisor</h1>
+    </header>
+
+    <main class="flex-grow p-4 overflow-y-auto flex flex-col items-center" id="chat-window">
+        <!-- Chat messages will be injected here -->
+        <div class="p-3 rounded-lg w-full max-w-3xl mb-4 shadow-sm bg-white border border-gray-200">
+            <strong class="block mb-1 text-sm text-gray-600">Advisor</strong>
+            <div>Hello! Upload a picture of a plant or ask me a botanical question.</div>
+        </div>
+    </main>
+
+    <footer class="p-4 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.1)] w-full">
+        <form id="chat-form" class="max-w-3xl mx-auto flex gap-2">
+            {% csrf_token %}
+            <label class="cursor-pointer bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded flex items-center justify-center transition">
+                <span>📷 Upload</span>
+                <input type="file" id="image-upload" name="image" accept="image/*" class="hidden">
+            </label>
+            <input type="text" id="user-input" name="message" required class="flex-grow border border-gray-300 rounded px-4 py-2 focus:outline-none focus:border-green-500" placeholder="Type your query here...">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-semibold transition">Send</button>
+        </form>
+    </footer>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const chatWindow = document.getElementById('chat-window');
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const messageInput = document.getElementById('user-input');
+            const imageInput = document.getElementById('image-upload');
+            
+            const messageText = messageInput.value;
+            const file = imageInput.files[0];
+            
+            // Render user message immediately
+            appendMessage('You', messageText + (file ? ' (Image attached)' : ''), 'bg-green-100 self-end ml-auto');
+            
+            const formData = new FormData();
+            formData.append('message', messageText);
+            if (file) formData.append('image', file);
+            
+            messageInput.value = '';
+            imageInput.value = '';
+
+            try {
+                const response = await fetch('/chat/api/chat/', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrftoken},
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const htmlResponse = marked.parse(data.response);
+                    appendMessage('Advisor', htmlResponse, 'bg-white self-start mr-auto border border-gray-200');
+                } else {
+                    appendMessage('Error', data.message, 'bg-red-100 self-start mr-auto');
+                }
+            } catch (err) {
+                appendMessage('Error', 'Failed to connect to the server.', 'bg-red-100 self-start mr-auto');
+            }
+        });
+
+        function appendMessage(sender, content, classes) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `p-3 rounded-lg w-full max-w-3xl mb-4 shadow-sm ${classes}`;
+            msgDiv.innerHTML = `<strong class="block mb-1 text-sm text-gray-600">${sender}</strong><div class="prose max-w-none">${content}</div>`;
+            chatWindow.appendChild(msgDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+    </script>
+</body>
+</html>
